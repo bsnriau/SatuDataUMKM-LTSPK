@@ -123,66 +123,96 @@
             </div>
         </section>
 
-        <!-- SECTION GRAFIK VISUALISASI NATIVE (OPSI 1) -->
-    <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <!-- Grafik 1: Sebaran Progres Pembinaan -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-column text-blue-600"></i>
-                    Sebaran Progres Pembinaan UKM
-                </h3>
-                <span class="text-xs font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Progres</span>
-            </div>
-            
-            <div class="space-y-3.5">
-                <div v-for="item in chartProgresData" :key="item.label">
-                    <div class="flex justify-between text-xs font-medium mb-1">
-                        <span class="text-slate-700 truncate max-w-[200px]" :title="item.label">{{ item.label }}</span>
-                        <span class="text-slate-500 font-semibold">{{ item.count }} Data ({{ item.percentage }}%)</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
-                             :style="{ width: item.percentage + '%' }">
-                        </div>
-                    </div>
+        <!-- BARIS CARD KEDUA: RINCIAN JENIS SERTIFIKASI -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <!-- Card Sertifikasi Awal -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">Sertifikasi Awal</p>
+                    <h3 class="text-2xl font-bold text-sky-600 mt-1">{{ totalSertifikasiAwal }}</h3>
                 </div>
-                <div v-if="chartProgresData.length === 0" class="text-xs text-slate-400 py-6 text-center">
-                    <i class="fa-solid fa-chart-line text-2xl mb-1 block"></i>
-                    Belum ada data progres untuk ditampilkan.
-                </div>
+                <div class="bg-sky-50 text-sky-600 p-3 rounded-xl"><i class="fa-solid fa-file-circle-plus text-lg"></i></div>
             </div>
-        </div>
 
-        <!-- Grafik 2: Top 5 Provinsi Binaan -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <i class="fa-solid fa-map-location-dot text-emerald-600"></i>
-                    Top 5 Wilayah Provinsi Binaan
-                </h3>
-                <span class="text-xs font-semibold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Wilayah</span>
+            <!-- Card Resertifikasi -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">Resertifikasi</p>
+                    <h3 class="text-2xl font-bold text-violet-600 mt-1">{{ totalResertifikasi }}</h3>
+                </div>
+                <div class="bg-violet-50 text-violet-600 p-3 rounded-xl"><i class="fa-solid fa-arrows-rotate text-lg"></i></div>
             </div>
-            
-            <div class="space-y-3.5">
-                <div v-for="item in chartProvinsiData" :key="item.label">
-                    <div class="flex justify-between text-xs font-medium mb-1">
-                        <span class="text-slate-700 truncate max-w-[200px]" :title="item.label">{{ item.label }}</span>
-                        <span class="text-slate-500 font-semibold">{{ item.count }} Data ({{ item.percentage }}%)</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" 
-                             :style="{ width: item.percentage + '%' }">
+
+            <!-- Card Surveilan -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">Surveilan</p>
+                    <h3 class="text-2xl font-bold text-orange-600 mt-1">{{ totalSurveilan }}</h3>
+                </div>
+                <div class="bg-orange-50 text-orange-600 p-3 rounded-xl"><i class="fa-solid fa-magnifying-glass-chart text-lg"></i></div>
+            </div>
+        </section>
+
+        <!-- SECTION GRAFIK VISUALISASI NATIVE (OPSI 1) -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Grafik 1: Sebaran Progres Pembinaan -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-blue-600"></i>
+                        Sebaran Progres Pembinaan UKM
+                    </h3>
+                    <span class="text-xs font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Progres</span>
+                </div>
+                
+                <div class="space-y-3.5">
+                    <div v-for="item in chartProgresData" :key="item.label">
+                        <div class="flex justify-between text-xs font-medium mb-1">
+                            <span class="text-slate-700 truncate max-w-[200px]" :title="item.label">{{ item.label }}</span>
+                            <span class="text-slate-500 font-semibold">{{ item.count }} Data ({{ item.percentage }}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
+                                :style="{ width: item.percentage + '%' }">
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div v-if="chartProvinsiData.length === 0" class="text-xs text-slate-400 py-6 text-center">
-                    <i class="fa-solid fa-earth-asia text-2xl mb-1 block"></i>
-                    Belum ada data wilayah untuk ditampilkan.
+                    <div v-if="chartProgresData.length === 0" class="text-xs text-slate-400 py-6 text-center">
+                        <i class="fa-solid fa-chart-line text-2xl mb-1 block"></i>
+                        Belum ada data progres untuk ditampilkan.
+                    </div>
                 </div>
             </div>
-        </div>
-    </section>
+
+            <!-- Grafik 2: Top 5 Provinsi Binaan -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-emerald-600"></i>
+                        Top 5 Wilayah Provinsi Binaan
+                    </h3>
+                    <span class="text-xs font-semibold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">Wilayah</span>
+                </div>
+                
+                <div class="space-y-3.5">
+                    <div v-for="item in chartProvinsiData" :key="item.label">
+                        <div class="flex justify-between text-xs font-medium mb-1">
+                            <span class="text-slate-700 truncate max-w-[200px]" :title="item.label">{{ item.label }}</span>
+                            <span class="text-slate-500 font-semibold">{{ item.count }} Data ({{ item.percentage }}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" 
+                                :style="{ width: item.percentage + '%' }">
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="chartProvinsiData.length === 0" class="text-xs text-slate-400 py-6 text-center">
+                        <i class="fa-solid fa-earth-asia text-2xl mb-1 block"></i>
+                        Belum ada data wilayah untuk ditampilkan.
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- TABEL DATA MASTER & FILTER TAMBAHAN -->
         <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
@@ -459,6 +489,30 @@
                 }).length;
             });
 
+            // 1. Total Sertifikasi Awal
+            const totalSertifikasiAwal = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    return prog.includes('awal') || prog.includes('sertifikasi awal');
+                }).length;
+            });
+
+            // 2. Total Resertifikasi
+            const totalResertifikasi = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    return prog.includes('resertifikasi') || prog.includes('ulang');
+                }).length;
+            });
+
+            // 3. Total Surveilan
+            const totalSurveilan = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    return prog.includes('surveilan') || prog.includes('surveillance');
+                }).length;
+            });
+
             // LOGIKA PAGINATION
             const totalPages = computed(() => {
                 return Math.ceil(filteredData.value.length / pageSize.value) || 1;
@@ -551,7 +605,8 @@
                 cardFilteredData, filteredData, paginatedData,
                 totalUkmUnik, totalPangan, totalNonPangan, totalSelesai,
                 currentPage, pageSize, totalPages, nextPage, prevPage,
-                chartProgresData, chartProvinsiData,formatDate
+                chartProgresData, chartProvinsiData,formatDate,
+                totalSertifikasiAwal, totalResertifikasi, totalSurveilan
             };
         }
     }).mount('#app');

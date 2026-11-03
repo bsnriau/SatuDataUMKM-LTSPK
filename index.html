@@ -211,12 +211,16 @@
                             <th class="p-3">No</th>
                             <th class="p-3">Nama Unit</th>
                             <th class="p-3">Nama UKM</th>
+                            <th class="p-3">Alamat</th>
                             <th class="p-3">Wilayah (Kota/Prov)</th>
+                            <th class="p-3">Kontak PIC</th>
                             <th class="p-3">Produk & Kategori</th>
                             <th class="p-3">Judul SNI</th>
                             <th class="p-3">Tahun Binaan</th>
                             <th class="p-3">Jenis Pembinaan</th>
                             <th class="p-3">Progres</th>
+                            <th class="p-3">Tanggal SPPT SNI</th>
+                            <th class="p-3">Status Sertifikat</th>
                             <th class="p-3">Detail Progres</th>
                         </tr>
                     </thead>
@@ -225,7 +229,9 @@
                             <td class="p-3 text-slate-500 font-medium">{{ (currentPage - 1) * pageSize + index + 1 }}</td>
                             <td class="p-3 font-medium text-slate-800">{{ item.nama_unit }}</td>
                             <td class="p-3 font-semibold text-blue-900">{{ item.namau_ukm || item.nama_umk }}</td>
+                            <td class="p-3 text-slate-600">{{ item.alamat_lengkap }}</td>
                             <td class="p-3 text-slate-600">{{ item.kota }}, {{ item.provinsi }}</td>
+                            <td class="p-3 text-slate-600">{{ item.kontak_pic || '-'}}</td>
                             <td class="p-3">
                                 <span class="block text-slate-800">{{ item.produk }}</span>
                                 <span class="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{{ item.kategori_produk }}</span>
@@ -236,6 +242,35 @@
                             <td class="p-3">
                                 <span class="px-2.5 py-1 text-xs rounded-full font-medium bg-blue-50 text-blue-700">
                                     {{ item.progres_pembinaan || item.progres }}
+                                </span>
+                            </td>
+                            <!-- ISI KOLOM TANGGAL SPPT SNI YANG SUDAH DIBERSIHKAN -->
+                            <td class="p-3 text-xs">
+                                <div class="text-slate-800 font-medium flex items-center gap-1">
+                                    <i class="fa-regular fa-calendar-days text-slate-400"></i> 
+                                    {{ formatDate(item.tanggal_sppt || item.tgl_sppt) }}
+                                </div>
+                                <div class="text-slate-500 mt-0.5 flex items-center gap-1">
+                                    <span class="text-[10px] text-slate-400">s/d</span> 
+                                    {{ formatDate(item.tanggal_berakhir_sppt || item.tgl_berakhir) }}
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <!-- Kondisi 1: Masih Berlaku (Warna Hijau) -->
+                                <span v-if="['masih berlaku', 'aktif', 'berlaku'].includes((item.status_sertifikat || '').toLowerCase())" 
+                                    class="px-2.5 py-1 text-xs rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                    <i class="fa-solid fa-circle-check text-[10px]"></i> {{ item.status_sertifikat }}
+                                </span>
+
+                                <!-- Kondisi 2: Sudah Tidak Berlaku / Kedaluwarsa (Warna Merah/Rose) -->
+                                <span v-else-if="['tidak berlaku', 'expired', 'kedaluwarsa', 'cabut'].some(k => (item.status_sertifikat || '').toLowerCase().includes(k))" 
+                                    class="px-2.5 py-1 text-xs rounded-full font-semibold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1">
+                                    <i class="fa-solid fa-circle-xmark text-[10px]"></i> {{ item.status_sertifikat }}
+                                </span>
+
+                                <!-- Kondisi 3: Tanda "-" atau Kosong (Warna Abu-abu Netral) -->
+                                <span v-else class="px-2.5 py-1 text-xs rounded-full font-medium bg-slate-100 text-slate-500 inline-block text-center">
+                                    {{ item.status_sertifikat || '-' }}
                                 </span>
                             </td>
                             <td class="p-3 text-slate-600 text-xs">{{ item.detail_progres || '-' }}</td>
@@ -448,47 +483,64 @@
             };
 
            // --- GRAFIK 1: Sebaran Progres Pembinaan UKM ---
-const chartProgresData = computed(() => {
-    if (!cardFilteredData.value || !Array.isArray(cardFilteredData.value)) return [];
+            const chartProgresData = computed(() => {
+                if (!cardFilteredData.value || !Array.isArray(cardFilteredData.value)) return [];
 
-    const counts = {};
-    cardFilteredData.value.forEach(item => {
-        const prog = item.progres_pembinaan || item.progres || 'Belum Terdefinisi';
-        counts[prog] = (counts[prog] || 0) + 1;
-    });
+                const counts = {};
+                cardFilteredData.value.forEach(item => {
+                    const prog = item.progres_pembinaan || item.progres || 'Belum Terdefinisi';
+                    counts[prog] = (counts[prog] || 0) + 1;
+                });
 
-    const total = cardFilteredData.value.length || 1;
-    
-    return Object.keys(counts).map(key => ({
-        label: key,
-        count: counts[key],
-        percentage: Math.round((counts[key] / total) * 100)
-    })).sort((a, b) => b.count - a.count); // Diurutkan dari yang terbanyak
-});
+                const total = cardFilteredData.value.length || 1;
+                
+                return Object.keys(counts).map(key => ({
+                    label: key,
+                    count: counts[key],
+                    percentage: Math.round((counts[key] / total) * 100)
+                })).sort((a, b) => b.count - a.count); // Diurutkan dari yang terbanyak
+            });
 
-// --- GRAFIK 2: Top 5 Provinsi Binaan ---
-const chartProvinsiData = computed(() => {
-    if (!cardFilteredData.value || !Array.isArray(cardFilteredData.value)) return [];
+            // --- GRAFIK 2: Top 5 Provinsi Binaan ---
+            const chartProvinsiData = computed(() => {
+                if (!cardFilteredData.value || !Array.isArray(cardFilteredData.value)) return [];
 
-    const counts = {};
-    cardFilteredData.value.forEach(item => {
-        const prov = item.provinsi || 'Lainnya / Tidak Diisi';
-        counts[prov] = (counts[prov] || 0) + 1;
-    });
+                const counts = {};
+                cardFilteredData.value.forEach(item => {
+                    const prov = item.provinsi || 'Lainnya / Tidak Diisi';
+                    counts[prov] = (counts[prov] || 0) + 1;
+                });
 
-    const total = cardFilteredData.value.length || 1;
-    
-    return Object.keys(counts)
-        .map(key => ({
-            label: key,
-            count: counts[key],
-            percentage: Math.round((counts[key] / total) * 100)
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5); // Hanya ambil 5 provinsi teratas (Top 5)
-});
+                const total = cardFilteredData.value.length || 1;
+                
+                return Object.keys(counts)
+                    .map(key => ({
+                        label: key,
+                        count: counts[key],
+                        percentage: Math.round((counts[key] / total) * 100)
+                    }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5); // Hanya ambil 5 provinsi teratas (Top 5)
+            });
 
-// Jangan lupa masukkan `chartProgresData` ke dalam objek return setup()!
+            // Fungsi untuk merapikan format tanggal ISO (Menghilangkan T, .000Z, dan membalik format jadi DD-MM-YYYY)
+            const formatDate = (dateString) => {
+                if (!dateString) return '-';
+                try {
+                    // Ambil bagian tahun, bulan, dan hari saja dari string tanggal
+                    const dateObj = new Date(dateString);
+                    if (isNaN(dateObj)) return dateString; // Jika bukan format tanggal valid, kembalikan apa adanya
+
+                    const day = String(dateObj.getDate()).padStart(2, '0');
+                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const year = dateObj.getFullYear();
+
+                    return `${day}-${month}-${year}`;
+                } catch (e) {
+                    return dateString;
+                }
+            };
+
 
             return {
                 loading, fetchData,
@@ -499,7 +551,7 @@ const chartProvinsiData = computed(() => {
                 cardFilteredData, filteredData, paginatedData,
                 totalUkmUnik, totalPangan, totalNonPangan, totalSelesai,
                 currentPage, pageSize, totalPages, nextPage, prevPage,
-                chartProgresData, chartProvinsiData
+                chartProgresData, chartProvinsiData,formatDate
             };
         }
     }).mount('#app');

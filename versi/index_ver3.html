@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pemantauan UKM Binaan - Master Data</title>
+    <link rel="icon" type="image/png" href="./img/bsn.png">
+
+    <!-- Font (ada fallback ke font sistem jika jaringan instansi memblokir Google Fonts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- VUE.JS LOKAL (Self-Hosted tanpa CDN publik) -->
+    <script src="./js/vue.global.prod.js"></script>
+    <!-- FontAwesome Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --ink: #0B2239;
+            --ink-2: #12324F;
+            --ink-3: #1D4468;
+            --paper: #EDF0F4;
+            --surface: #FFFFFF;
+            --line: #DAE0E7;
+            --line-soft: #E8ECF1;
+            --text: #17283A;
+            --muted: #5A6B7D;
+            --faint: #8493A3;
+
+            --teal: #0F9D8A;
+            --teal-soft: #E3F4F1;
+            --teal-ink: #0A6E61;
+            --amber: #E3A008;
+            --amber-soft: #FCF3DC;
+            --amber-ink: #8A5F00;
+            --rose-soft: #FBE9E7;
+            --rose-ink: #97312A;
+
+            --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+            --font-body: 'IBM Plex Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; }
+        [v-cloak] { display: none; }
+
+        body {
+            font-family: var(--font-body);
+            font-size: 15px;
+            line-height: 1.5;
+            color: var(--text);
+            background: var(--paper);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .wrap { width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+        :focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
+        .stage :focus-visible { outline-color: #fff; }
+
+        /* ---------- Loading ---------- */
+        .overlay {
+            position: fixed; inset: 0; z-index: 50;
+            display: grid; place-items: center; padding: 16px;
+            background: rgba(11, 34, 57, .72);
+            backdrop-filter: blur(6px);
+        }
+        .overlay-card {
+            background: #fff; border-radius: 18px; padding: 28px 32px;
+            max-width: 380px; width: 100%; text-align: center;
+        }
+        .spinner {
+            width: 36px; height: 36px; margin: 0 auto 16px;
+            border: 3px solid var(--line); border-top-color: var(--ink-3);
+            border-radius: 50%; animation: spin .8s linear infinite;
+        }
+        .overlay-card h3 { font-family: var(--font-display); font-size: 18px; font-weight: 650; color: var(--ink); }
+        .overlay-card p { font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---------- Stage: header + hero ---------- */
+        .stage { background: var(--ink); color: #fff; padding-bottom: 112px; }
+
+        .topbar {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            gap: 16px; padding: 20px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .12);
+        }
+        .brand { display: flex; align-items: center; gap: 10px; }
+        .logo {
+            width: 44px; height: 44px; padding: 5px; border-radius: 10px;
+            background: #fff; display: grid; place-items: center; flex: none;
+        }
+        .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .brand-text { margin-left: 8px; }
+        .brand-text h1 { font-family: var(--font-display); font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.2; }
+        .brand-text p { font-size: 13px; color: #9FB3C8; }
+
+        .sync { display: flex; align-items: center; gap: 14px; }
+        .sync-time { font-size: 13px; color: #9FB3C8; }
+        .btn-sync {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: #fff; color: var(--ink); border: 0; border-radius: 10px;
+            padding: 10px 16px; font: 600 14px var(--font-body); cursor: pointer;
+            transition: background .15s;
+        }
+        .btn-sync:hover:not(:disabled) { background: #DCE6F0; }
+        .btn-sync:disabled { opacity: .6; cursor: progress; }
+
+        .hero {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+            gap: 40px 72px; align-items: end; padding-top: 48px;
+        }
+        .big {
+            font-family: var(--font-display); font-weight: 700;
+            font-size: clamp(84px, 13vw, 150px); line-height: .88; letter-spacing: -.045em;
+            font-variant-numeric: tabular-nums;
+        }
+        .big-caption { font-size: 20px; font-weight: 500; margin-top: 16px; }
+        .big-scope { font-size: 14px; color: #9FB3C8; margin-top: 2px; }
+
+        .hero-stats > div {
+            display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+            padding: 14px 0; border-top: 1px solid rgba(255, 255, 255, .14);
+        }
+        .hero-stats dt { font-size: 14px; color: #9FB3C8; }
+        .hero-stats dd { font-family: var(--font-display); font-size: 32px; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .pill {
+            font: 600 13px var(--font-body); margin-left: 8px; padding: 2px 8px; border-radius: 999px;
+            background: rgba(79, 209, 197, .16); color: #7BE4D8; vertical-align: middle;
+        }
+
+        .progress-block { grid-column: 1 / -1; margin-top: 8px; }
+        .progress-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+        .progress-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 650; }
+        .progress-head span { font-size: 13px; color: #9FB3C8; }
+
+        .stack { display: flex; gap: 3px; height: 56px; }
+        .seg {
+            flex: 0 1 0; min-width: 6px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 600; color: var(--ink);
+            white-space: nowrap; overflow: hidden;
+            transition: flex-grow .9s cubic-bezier(.2, .7, .2, 1);
+        }
+        .stack-empty {
+            height: 56px; border: 1px dashed rgba(255, 255, 255, .25); border-radius: 8px;
+            display: grid; place-items: center; font-size: 13.5px; color: #9FB3C8;
+        }
+
+        .legend {
+            list-style: none; padding: 0; margin-top: 20px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 28px;
+        }
+        .legend li { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; }
+        .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+        .legend .lg-label { flex: 1; min-width: 0; color: #D6E0EB; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .legend .lg-count { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        /* ---------- Filter ---------- */
+        .main { padding-bottom: 48px; }
+        .filters {
+            position: relative; margin-top: -64px;
+            background: #fff; border-radius: 16px; padding: 20px 24px;
+            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: end;
+            box-shadow: 0 18px 40px -18px rgba(11, 34, 57, .45);
+        }
+        .field label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+
+        select, input[type="text"] {
+            width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px;
+            background-color: #fff; color: var(--text); font: 400 14px var(--font-body);
+            padding: 0 12px; transition: border-color .15s;
+        }
+        select {
+            appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%235A6B7D' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 14px center;
+        }
+        select:hover, input[type="text"]:hover { border-color: #B7C2CE; }
+        select:focus-visible, input[type="text"]:focus-visible { border-color: var(--ink-3); outline: 2px solid rgba(29, 68, 104, .25); outline-offset: 0; }
+
+        .btn-ghost {
+            height: 44px; padding: 0 16px; border-radius: 10px; cursor: pointer;
+            border: 1px solid var(--line); background: #fff; color: var(--ink);
+            font: 500 14px var(--font-body); transition: background .15s;
+        }
+        .btn-ghost:hover:not(:disabled) { background: var(--paper); }
+        .btn-ghost:disabled { opacity: .45; cursor: default; }
+        .filters .btn-ghost { width: 100%; }
+        .field select.active { border-color: var(--ink-3); background-color: #F2F7FC; font-weight: 500; }
+
+        .notice {
+            margin-top: 20px; padding: 14px 18px; border-radius: 12px;
+            background: var(--rose-soft); color: var(--rose-ink); font-size: 14px;
+            display: flex; gap: 10px; align-items: flex-start;
+        }
+
+        /* ---------- Panels ---------- */
+        .panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 24px; }
+        .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+        .panel h2 { font-family: var(--font-display); font-size: 17px; font-weight: 650; color: var(--ink); line-height: 1.3; }
+        .panel .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+        .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
+        .duo .num { font-family: var(--font-display); font-size: 42px; font-weight: 700; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+        .duo .lbl { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); margin-top: 8px; }
+        .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; }
+        .dot.pangan { background: var(--teal); }
+        .dot.non { background: var(--amber); }
+        .split { display: flex; gap: 3px; height: 12px; margin-top: 22px; }
+        .split span { border-radius: 6px; flex-basis: 0; flex-shrink: 1; min-width: 4px; transition: flex-grow .7s cubic-bezier(.2, .7, .2, 1); }
+        .split .s-pangan { background: var(--teal); }
+        .split .s-non { background: var(--amber); }
+
+        .rank { list-style: none; padding: 0; margin-top: 18px; display: grid; gap: 16px; }
+        .rank-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
+        .rank-row .name { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rank-row .val { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+        .rank-row .val b { color: var(--ink); font-weight: 600; }
+        .track { height: 6px; border-radius: 3px; background: var(--line-soft); margin-top: 7px; overflow: hidden; }
+        .track i { display: block; height: 100%; border-radius: 3px; background: var(--ink-3); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
+        .panel-empty { font-size: 13.5px; color: var(--faint); padding: 24px 0 8px; }
+
+        /* ---------- Tabel ---------- */
+        .table-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 20px; }
+        .table-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
+        .table-head h2 { font-family: var(--font-display); font-size: 20px; font-weight: 650; color: var(--ink); line-height: 1.25; }
+        .table-head p { font-size: 13px; color: var(--muted); }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 10px; flex: 1; justify-content: flex-end; min-width: 280px; }
+        .search { position: relative; flex: 1 1 320px; max-width: 440px; }
+        .search i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--faint); font-size: 13px; pointer-events: none; }
+        .search input { padding-left: 36px; }
+
+        .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+        table { width: 100%; min-width: 1240px; border-collapse: collapse; font-size: 14px; }
+        th {
+            background: #F6F8FA; text-align: left; font-weight: 600; font-size: 13px; color: var(--muted);
+            padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
+        }
+        td { padding: 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+        tbody tr:last-child td { border-bottom: 0; }
+        tbody tr:hover { background: #F8FAFC; }
+        .col-no { width: 52px; color: var(--faint); font-variant-numeric: tabular-nums; }
+        .col-ukm { min-width: 260px; }
+        .cell-name { font-weight: 600; color: var(--ink); line-height: 1.35; }
+        .cell-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+        .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .unit-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--ink-3); margin-top: 6px; }
+        .muted { color: var(--muted); }
+
+        .chip {
+            display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+            font-size: 12.5px; font-weight: 500; background: #EEF2F7; color: #33475C; line-height: 1.5;
+        }
+        .chip.done { background: var(--teal-soft); color: var(--teal-ink); }
+        .chip.ok { background: var(--teal-soft); color: var(--teal-ink); font-weight: 600; }
+        .chip.bad { background: var(--rose-soft); color: var(--rose-ink); font-weight: 600; }
+        .chip.none { background: #EEF2F7; color: var(--faint); }
+        .cat { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+        .empty-cell { text-align: center; color: var(--faint); padding: 48px 16px; }
+        .empty-cell i { display: block; font-size: 28px; margin-bottom: 8px; }
+
+        .pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; }
+        .pager-info { font-size: 13px; color: var(--muted); }
+        .pager-info b { color: var(--ink); font-weight: 600; }
+        .pager-nav { display: flex; align-items: center; gap: 10px; }
+        .pager-nav .btn-ghost { height: 38px; font-size: 13px; padding: 0 14px; }
+        .pager-nav .page { font-size: 13px; font-weight: 600; color: var(--ink); min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+
+        /* ---------- Responsif ---------- */
+        @media (max-width: 1080px) {
+            .panels { grid-template-columns: 1fr; }
+            .hero { grid-template-columns: 1fr; }
+            .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 860px) {
+            .wrap { padding: 0 16px; }
+            .stage { padding-bottom: 96px; }
+            .filters { grid-template-columns: 1fr; padding: 18px; }
+            .sync-time { display: none; }
+            .stack, .stack-empty { height: 44px; }
+            .toolbar { justify-content: stretch; }
+            .search { max-width: none; flex-basis: 100%; }
+
+            .table-card, .panel { padding: 18px; }
+            .table-scroll { border: 0; overflow: visible; }
+            table { min-width: 0; }
+            thead { display: none; }
+            table, tbody { display: block; }
+            tbody tr { display: block; border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; margin-bottom: 12px; }
+            td { display: grid; grid-template-columns: 104px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+            td::before { content: attr(data-label); font-size: 12.5px; color: var(--faint); }
+            td.col-no { display: none; }
+            td.empty-cell { display: block; }
+            td.empty-cell::before { content: none; }
+            .pager { justify-content: center; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" v-cloak>
+
+    <!-- LOADING OVERLAY -->
+    <div v-if="loading" class="overlay" role="status" aria-live="polite">
+        <div class="overlay-card">
+            <div class="spinner"></div>
+            <h3>Menyiapkan data dashboard</h3>
+            <p>Sedang menyinkronkan data UKM dari 7 LTSPK. Mohon tunggu sebentar.</p>
+        </div>
+    </div>
+
+    <!-- HEADER + HERO -->
+    <div class="stage">
+        <div class="wrap">
+            <header class="topbar">
+                <div class="brand">
+                    <span class="logo"><img src="./img/bsn.png" alt="Logo BSN"></span>
+                    <span class="logo"><img src="./img/Logo1.png" alt="Logo kantor"></span>
+                    <div class="brand-text">
+                        <h1>Dashboard Pemantauan UKM Binaan</h1>
+                        <p>Integrasi master data LTSPK BSN di daerah</p>
+                    </div>
+                </div>
+                <div class="sync">
+                    <span class="sync-time" v-if="lastSync">Disinkronkan pukul {{ lastSync }}</span>
+                    <button class="btn-sync" @click="fetchData" :disabled="loading">
+                        <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-rotate'"></i>
+                        {{ loading ? 'Menyinkronkan...' : 'Sinkron ulang data' }}
+                    </button>
+                </div>
+            </header>
+
+            <section class="hero" aria-label="Ringkasan">
+                <div>
+                    <div class="big">{{ totalUkmUnik }}</div>
+                    <p class="big-caption">UKM binaan unik</p>
+                    <p class="big-scope">{{ scopeLabel }}</p>
+                </div>
+
+                <dl class="hero-stats">
+                    <div>
+                        <dt>Total entri data</dt>
+                        <dd>{{ cardFilteredData.length }}</dd>
+                    </div>
+                    <div>
+                        <dt>Tersertifikasi / selesai</dt>
+                        <dd>{{ totalSelesai }}<span class="pill">{{ selesaiPct }}%</span></dd>
+                    </div>
+                </dl>
+
+                <div class="progress-block">
+                    <div class="progress-head">
+                        <h2>Sebaran progres pembinaan UKM</h2>
+                        <span>{{ chartProgresData.length }} tahap</span>
+                    </div>
+
+                    <div v-if="chartProgresData.length" class="stack">
+                        <div v-for="(seg, i) in chartProgresData" :key="seg.label" class="seg"
+                             :style="{ flexGrow: barReady ? seg.count : 0, background: progresColor(i) }"
+                             :title="seg.label + ': ' + seg.count + ' data (' + seg.percentage + '%)'">
+                            <span v-if="seg.percentage >= 7">{{ seg.percentage }}%</span>
+                        </div>
+                    </div>
+                    <div v-else class="stack-empty">Belum ada data progres untuk ditampilkan.</div>
+
+                    <ul class="legend" v-if="chartProgresData.length">
+                        <li v-for="(seg, i) in chartProgresData" :key="seg.label">
+                            <span class="swatch" :style="{ background: progresColor(i) }"></span>
+                            <span class="lg-label" :title="seg.label">{{ seg.label }}</span>
+                            <span class="lg-count">{{ seg.count }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <main class="wrap main">
+
+        <!-- FILTER UTAMA BERJENJANG -->
+        <section class="filters" aria-label="Filter utama dashboard">
+            <div class="field" v-for="f in filterFields" :key="f.key">
+                <label :for="'f-' + f.key">{{ f.label }}</label>
+                <select :id="'f-' + f.key" v-model="filters[f.key]" :class="{ active: filters[f.key] }">
+                    <option value="">{{ f.all }}</option>
+                    <option v-for="o in options[f.key]" :key="o.value" :value="o.value">{{ o.value }} ({{ o.count }})</option>
+                </select>
+            </div>
+            <button class="btn-ghost" @click="resetFilters" :disabled="!hasFilter">
+                <i class="fa-solid fa-rotate-left" style="margin-right:8px;font-size:12px"></i>Atur ulang filter
+            </button>
+        </section>
+
+        <div v-if="errorMsg" class="notice" role="alert">
+            <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px"></i>
+            <div>Data gagal dimuat. Periksa koneksi internet, lalu pilih Sinkron ulang data. <span style="opacity:.8">({{ errorMsg }})</span></div>
+        </div>
+
+        <!-- PANEL RINGKASAN -->
+        <section class="panels">
+            <!-- Kategori produk -->
+            <article class="panel">
+                <h2>Kategori produk</h2>
+                <p class="sub">Dari {{ totalPangan + totalNonPangan }} entri sesuai filter</p>
+                <div class="duo">
+                    <div>
+                        <div class="num">{{ totalPangan }}</div>
+                        <div class="lbl"><span class="dot pangan"></span>Produk pangan</div>
+                    </div>
+                    <div>
+                        <div class="num">{{ totalNonPangan }}</div>
+                        <div class="lbl"><span class="dot non"></span>Non-pangan</div>
+                    </div>
+                </div>
+                <div class="split" aria-hidden="true">
+                    <span class="s-pangan" :style="{ flexGrow: totalPangan }"></span>
+                    <span class="s-non" :style="{ flexGrow: totalNonPangan }"></span>
+                </div>
+            </article>
+
+            <!-- Jenis pembinaan -->
+            <article class="panel">
+                <h2>Jenis sertifikasi</h2>
+                <p class="sub">Jumlah entri per jenis pembinaan</p>
+                <ul class="rank">
+                    <li v-for="row in jenisRows" :key="row.label">
+                        <div class="rank-row">
+                            <span class="name">{{ row.label }}</span>
+                            <span class="val"><b>{{ row.count }}</b> ({{ row.pct }}%)</span>
+                        </div>
+                        <div class="track"><i :style="{ width: row.pct + '%' }"></i></div>
+                    </li>
+                </ul>
+            </article>
+
+            <!-- Top 5 provinsi -->
+            <article class="panel">
+                <h2>5 provinsi dengan UKM binaan terbanyak</h2>
+                <p class="sub">Berdasarkan jumlah entri data</p>
+                <ul class="rank" v-if="chartProvinsiData.length">
+                    <li v-for="item in chartProvinsiData" :key="item.label">
+                        <div class="rank-row">
+                            <span class="name" :title="item.label">{{ item.label }}</span>
+                            <span class="val"><b>{{ item.count }}</b> ({{ item.percentage }}%)</span>
+                        </div>
+                        <div class="track"><i :style="{ width: (item.count / chartProvinsiData[0].count * 100) + '%' }"></i></div>
+                    </li>
+                </ul>
+                <p v-else class="panel-empty">Belum ada data wilayah untuk ditampilkan.</p>
+            </article>
+        </section>
+
+        <!-- TABEL DATA MASTER -->
+        <section class="table-card">
+            <div class="table-head">
+                <div>
+                    <h2>Rincian data master UKM binaan</h2>
+                    <p>{{ filteredData.length }} data ditemukan</p>
+                </div>
+                <div class="toolbar">
+                    <div class="search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" v-model="searchKeyword" placeholder="Cari nama UKM, produk, atau SNI" aria-label="Cari data">
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>UKM</th>
+                            <th>Wilayah</th>
+                            <th>Kontak PIC</th>
+                            <th>Produk</th>
+                            <th>Judul SNI</th>
+                            <th>Pembinaan</th>
+                            <th>Progres</th>
+                            <th>Tanggal SPPT SNI</th>
+                            <th>Status sertifikat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item, index) in paginatedData" :key="(currentPage - 1) * pageSize + index">
+                            <td class="col-no" data-label="No">{{ (currentPage - 1) * pageSize + index + 1 }}</td>
+
+                            <td class="col-ukm" data-label="UKM">
+                                <div class="cell-name">{{ item.namau_ukm || item.nama_umk }}</div>
+                                <div class="cell-sub clamp" :title="item.alamat_lengkap">{{ item.alamat_lengkap || '-' }}</div>
+                                <div class="unit-tag"><i class="fa-regular fa-building"></i>{{ item.nama_unit }}</div>
+                            </td>
+
+                            <td data-label="Wilayah">
+                                <div class="cell-name" style="font-weight:500">{{ item.kota }}</div>
+                                <div class="cell-sub">{{ item.provinsi }}</div>
+                            </td>
+
+                            <td data-label="Kontak PIC" class="muted">{{ item.kontak_pic || '-' }}</td>
+
+                            <td data-label="Produk">
+                                <div>{{ item.produk }}</div>
+                                <span class="cat"><span class="dot" :class="kategoriKind(item)"></span>{{ item.kategori_produk }}</span>
+                            </td>
+
+                            <td data-label="Judul SNI">{{ item.judul_sni || item.sni_yang_diterapkan || '-' }}</td>
+
+                            <td data-label="Pembinaan">
+                                <div class="cell-name" style="font-weight:500">{{ item.tahun_mulai_dibina || item.tahun_awal_dibina }}</div>
+                                <div class="cell-sub">{{ item.jenis_pembinaan || '-' }}</div>
+                            </td>
+
+                            <td data-label="Progres">
+                                <span class="chip" :class="{ done: isSelesai(item) }">{{ item.progres_pembinaan || item.progres }}</span>
+                                <div class="cell-sub" v-if="item.detail_progres">{{ item.detail_progres }}</div>
+                            </td>
+
+                            <td data-label="Tanggal SPPT SNI" style="white-space:nowrap">
+                                <div>{{ formatDate(item.tanggal_sppt || item.tgl_sppt) }}</div>
+                                <div class="cell-sub">s/d {{ formatDate(item.tanggal_berakhir_sppt || item.tgl_berakhir) }}</div>
+                            </td>
+
+                            <td data-label="Status sertifikat">
+                                <span v-if="statusKind(item) === 'ok'" class="chip ok"><i class="fa-solid fa-circle-check" style="font-size:11px"></i>{{ item.status_sertifikat }}</span>
+                                <span v-else-if="statusKind(item) === 'bad'" class="chip bad"><i class="fa-solid fa-circle-xmark" style="font-size:11px"></i>{{ item.status_sertifikat }}</span>
+                                <span v-else class="chip none">{{ item.status_sertifikat || '-' }}</span>
+                            </td>
+                        </tr>
+                        <tr v-if="paginatedData.length === 0">
+                            <td colspan="10" class="empty-cell">
+                                <i class="fa-regular fa-folder-open"></i>
+                                Tidak ada data yang sesuai filter. Ubah atau atur ulang filter untuk melihat data.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PAGINATION -->
+            <div class="pager">
+                <div class="pager-info">
+                    Menampilkan <b>{{ rangeStart }}–{{ rangeEnd }}</b> dari <b>{{ filteredData.length }}</b> data
+                </div>
+                <div class="pager-nav">
+                    <button class="btn-ghost" @click="prevPage" :disabled="currentPage === 1">
+                        <i class="fa-solid fa-chevron-left" style="margin-right:6px;font-size:11px"></i>Sebelumnya
+                    </button>
+                    <span class="page">{{ currentPage }} / {{ totalPages }}</span>
+                    <button class="btn-ghost" @click="nextPage" :disabled="currentPage >= totalPages">
+                        Selanjutnya<i class="fa-solid fa-chevron-right" style="margin-left:6px;font-size:11px"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<!-- SCRIPT VUE 3 LOKAL LOGIC -->
+<script>
+    const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+
+    createApp({
+        setup() {
+            const rawData = ref([]);
+            const loading = ref(true);
+            const errorMsg = ref('');
+            const lastSync = ref('');
+            const barReady = ref(false);
+
+            const searchKeyword = ref('');
+            const currentPage = ref(1);
+            const pageSize = ref(10); // Jumlah data per halaman
+
+            // =====================================================================
+            // FILTER TERPADU (SALING TERHUBUNG / FACETED)
+            // Setiap filter punya: key, label, teks "semua", dan fungsi pengambil nilai dari data.
+            // Opsi sebuah filter dihitung dari data yang sudah disaring oleh SEMUA filter lain
+            // (filter itu sendiri tidak ikut menyaring, supaya pilihannya tetap bisa diganti).
+            // =====================================================================
+            const filterFields = [
+                { key: 'unit',     label: 'Nama unit',         all: 'Semua unit',     get: i => i.nama_unit },
+                { key: 'provinsi', label: 'Provinsi',          all: 'Semua provinsi', get: i => i.provinsi },
+                { key: 'kota',     label: 'Kota / kabupaten',  all: 'Semua kota',     get: i => i.kota },
+                { key: 'tahun',    label: 'Tahun binaan',      all: 'Semua tahun',    get: i => i.tahun_mulai_dibina || i.tahun_awal_dibina },
+                { key: 'progres',  label: 'Progres pembinaan', all: 'Semua progres',  get: i => i.progres_pembinaan || i.progres },
+                { key: 'jenis',    label: 'Jenis sertifikasi', all: 'Semua jenis',    get: i => i.jenis_pembinaan || i.jenis },
+                { key: 'kategori', label: 'Kategori produk',   all: 'Semua kategori', get: i => i.kategori_produk }
+            ];
+
+            const filters = reactive({});
+            filterFields.forEach(f => { filters[f.key] = ''; });
+
+            // Nilai field yang sudah dirapikan (string, tanpa spasi berlebih)
+            const val = (f, item) => String(f.get(item) ?? '').trim();
+
+            // Apakah item lolos semua filter aktif, kecuali filter dengan key = skipKey
+            const matchesFilters = (item, skipKey) => {
+                return filterFields.every(f =>
+                    f.key === skipKey || !filters[f.key] || val(f, item) === filters[f.key]
+                );
+            };
+
+            // Opsi tiap filter + jumlah data per opsi, mengikuti pilihan filter lain
+            const options = computed(() => {
+                const out = {};
+                const data = Array.isArray(rawData.value) ? rawData.value : [];
+                filterFields.forEach(f => {
+                    const counts = new Map();
+                    data.forEach(item => {
+                        if (!matchesFilters(item, f.key)) return;
+                        const v = val(f, item);
+                        if (!v) return;
+                        counts.set(v, (counts.get(v) || 0) + 1);
+                    });
+                    const list = [...counts].map(([value, count]) => ({ value, count }));
+                    list.sort(f.key === 'tahun'
+                        ? (a, b) => Number(b.value) - Number(a.value)      // tahun terbaru di atas
+                        : (a, b) => a.value.localeCompare(b.value, 'id'));
+                    out[f.key] = list;
+                });
+                return out;
+            });
+
+            // Jika pilihan lama tidak lagi tersedia (misal setelah sinkron ulang), kosongkan
+            const sanitizeFilters = () => {
+                filterFields.forEach(f => {
+                    if (filters[f.key] && !options.value[f.key].some(o => o.value === filters[f.key])) {
+                        filters[f.key] = '';
+                    }
+                });
+            };
+
+            const hasFilter = computed(() => filterFields.some(f => !!filters[f.key]));
+            const resetFilters = () => { filterFields.forEach(f => { filters[f.key] = ''; }); };
+
+            // Reset halaman ke 1 jika filter atau pencarian berubah
+            watch(filters, () => { currentPage.value = 1; });
+            watch(searchKeyword, () => { currentPage.value = 1; });
+
+            const scopeLabel = computed(() => {
+                if (filters.kota) return `di ${filters.kota}${filters.provinsi ? ', ' + filters.provinsi : ''}`;
+                if (filters.provinsi) return `di Provinsi ${filters.provinsi}`;
+                if (filters.unit) return `di bawah ${filters.unit}`;
+                if (hasFilter.value) return 'sesuai filter yang dipilih';
+                return 'di seluruh unit dan wilayah';
+            });
+
+            // =====================================================================
+            // AMBIL DATA
+            // =====================================================================
+            // URL Google Apps Script
+            const gasUrl = 'https://script.google.com/macros/s/AKfycbyiDL-zMP4S0pLrlceXTMFxYIt-2VCIy4Y69cIRARB52X7qwGa7powGY5AvB4tkuH1ZwA/exec';
+
+            const fetchData = async () => {
+                loading.value = true;
+                errorMsg.value = '';
+                barReady.value = false;
+                try {
+                    const response = await fetch(gasUrl);
+                    const data = await response.json();
+
+                    // 1. Ambil data dalam bentuk array
+                    let processedData = Array.isArray(data) ? data : (data.data || []);
+
+                    // 2. Urutkan berdasarkan tahun terbaru (descending)
+                    processedData.sort((a, b) => {
+                        const tahunA = Number(a.tahun_mulai_dibina || a.tahun_awal_dibina || 0);
+                        const tahunB = Number(b.tahun_mulai_dibina || b.tahun_awal_dibina || 0);
+                        return tahunB - tahunA;
+                    });
+
+                    // 3. Masukkan ke rawData, lalu bersihkan pilihan filter yang sudah tidak valid
+                    rawData.value = processedData;
+                    sanitizeFilters();
+                    lastSync.value = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                } catch (error) {
+                    errorMsg.value = String(error && error.message ? error.message : error);
+                } finally {
+                    loading.value = false;
+                    // Bilah progres "tumbuh" sekali setelah data siap
+                    setTimeout(() => { barReady.value = true; }, 120);
+                }
+            };
+
+            onMounted(() => {
+                fetchData();
+            });
+
+            // =====================================================================
+            // DATA TURUNAN
+            // =====================================================================
+            // 1. Data untuk statistik & grafik: dipengaruhi SEMUA filter
+            const cardFilteredData = computed(() => {
+                if (!Array.isArray(rawData.value)) return [];
+                return rawData.value.filter(item => matchesFilters(item, null));
+            });
+
+            // 2. Data untuk tabel: semua filter + kotak pencarian
+            const filteredData = computed(() => {
+                const kw = searchKeyword.value.trim().toLowerCase();
+                if (!kw) return cardFilteredData.value;
+                return cardFilteredData.value.filter(item =>
+                    (item.namau_ukm || item.nama_umk || '').toLowerCase().includes(kw) ||
+                    (item.produk || '').toLowerCase().includes(kw) ||
+                    (item.judul_sni || item.sni_yang_diterapkan || '').toLowerCase().includes(kw)
+                );
+            });
+
+            // STATISTIK
+            const totalUkmUnik = computed(() => {
+                const names = cardFilteredData.value.map(i => i.namau_ukm || i.nama_umk);
+                return [...new Set(names)].length;
+            });
+
+            const totalPangan = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const kat = (i.kategori_produk || '').toLowerCase();
+                    return kat.includes('pangan') && !kat.includes('non');
+                }).length;
+            });
+
+            const totalNonPangan = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const kat = (i.kategori_produk || '').toLowerCase();
+                    return kat.includes('non') || !kat.includes('pangan');
+                }).length;
+            });
+
+            const isSelesai = (i) => {
+                const prog = (i.progres_pembinaan || i.progres || '').toLowerCase();
+                return prog.includes('sppt sni') || prog.includes('selesai') || prog.includes('tersertifikasi');
+            };
+
+            const totalSelesai = computed(() => cardFilteredData.value.filter(isSelesai).length);
+
+            const selesaiPct = computed(() => {
+                const n = cardFilteredData.value.length;
+                return n ? Math.round((totalSelesai.value / n) * 100) : 0;
+            });
+
+            const totalSertifikasiAwal = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    return prog.includes('awal') || prog.includes('sertifikasi awal');
+                }).length;
+            });
+
+            const totalResertifikasi = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    return prog.includes('resertifikasi') || prog.includes('ulang');
+                }).length;
+            });
+
+            const totalSurveilan = computed(() => {
+                return cardFilteredData.value.filter(i => {
+                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    return prog.includes('surveilan') || prog.includes('surveillance');
+                }).length;
+            });
+
+            const jenisRows = computed(() => {
+                const n = cardFilteredData.value.length || 1;
+                const pct = (v) => Math.round((v / n) * 100);
+                return [
+                    { label: 'Sertifikasi awal', count: totalSertifikasiAwal.value, pct: pct(totalSertifikasiAwal.value) },
+                    { label: 'Resertifikasi', count: totalResertifikasi.value, pct: pct(totalResertifikasi.value) },
+                    { label: 'Surveilan', count: totalSurveilan.value, pct: pct(totalSurveilan.value) }
+                ];
+            });
+
+            // LOGIKA PAGINATION
+            const totalPages = computed(() => Math.ceil(filteredData.value.length / pageSize.value) || 1);
+
+            const paginatedData = computed(() => {
+                const start = (currentPage.value - 1) * pageSize.value;
+                return filteredData.value.slice(start, start + pageSize.value);
+            });
+
+            const rangeStart = computed(() => filteredData.value.length ? (currentPage.value - 1) * pageSize.value + 1 : 0);
+            const rangeEnd = computed(() => Math.min(currentPage.value * pageSize.value, filteredData.value.length));
+
+            const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
+            const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };
+
+            // --- GRAFIK 1: Sebaran Progres Pembinaan UKM ---
+            const chartProgresData = computed(() => {
+                const counts = {};
+                cardFilteredData.value.forEach(item => {
+                    const prog = item.progres_pembinaan || item.progres || 'Belum Terdefinisi';
+                    counts[prog] = (counts[prog] || 0) + 1;
+                });
+
+                const total = cardFilteredData.value.length || 1;
+
+                return Object.keys(counts).map(key => ({
+                    label: key,
+                    count: counts[key],
+                    percentage: Math.round((counts[key] / total) * 100)
+                })).sort((a, b) => b.count - a.count);
+            });
+
+            // --- GRAFIK 2: Top 5 Provinsi Binaan ---
+            const chartProvinsiData = computed(() => {
+                const counts = {};
+                cardFilteredData.value.forEach(item => {
+                    const prov = item.provinsi || 'Lainnya / Tidak Diisi';
+                    counts[prov] = (counts[prov] || 0) + 1;
+                });
+
+                const total = cardFilteredData.value.length || 1;
+
+                return Object.keys(counts)
+                    .map(key => ({
+                        label: key,
+                        count: counts[key],
+                        percentage: Math.round((counts[key] / total) * 100)
+                    }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5);
+            });
+
+            // Warna segmen bilah progres (urut dari jumlah terbanyak)
+            const palette = ['#4FD1C5', '#F5B83D', '#7DB3FF', '#F2A3A0', '#B9A4FF', '#D9CBB0', '#9BD3A5', '#C5D0DC'];
+            const progresColor = (i) => palette[i % palette.length];
+
+            // Status sertifikat -> 'ok' | 'bad' | 'none'
+            const statusKind = (item) => {
+                const s = (item.status_sertifikat || '').toLowerCase();
+                if (['masih berlaku', 'aktif', 'berlaku'].includes(s)) return 'ok';
+                if (['tidak berlaku', 'expired', 'kedaluwarsa', 'cabut'].some(k => s.includes(k))) return 'bad';
+                return 'none';
+            };
+
+            const kategoriKind = (item) => {
+                const kat = (item.kategori_produk || '').toLowerCase();
+                return kat.includes('pangan') && !kat.includes('non') ? 'pangan' : 'non';
+            };
+
+            // Merapikan format tanggal ISO menjadi DD-MM-YYYY
+            const formatDate = (dateString) => {
+                if (!dateString) return '-';
+                try {
+                    const dateObj = new Date(dateString);
+                    if (isNaN(dateObj)) return dateString;
+
+                    const day = String(dateObj.getDate()).padStart(2, '0');
+                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const year = dateObj.getFullYear();
+
+                    return `${day}-${month}-${year}`;
+                } catch (e) {
+                    return dateString;
+                }
+            };
+
+            return {
+                loading, errorMsg, lastSync, barReady, fetchData,
+                filterFields, filters, options, hasFilter, resetFilters, scopeLabel,
+                searchKeyword,
+                cardFilteredData, filteredData, paginatedData,
+                totalUkmUnik, totalPangan, totalNonPangan, totalSelesai, selesaiPct,
+                totalSertifikasiAwal, totalResertifikasi, totalSurveilan, jenisRows,
+                currentPage, pageSize, totalPages, rangeStart, rangeEnd, nextPage, prevPage,
+                chartProgresData, chartProvinsiData, progresColor,
+                statusKind, kategoriKind, isSelesai, formatDate
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>

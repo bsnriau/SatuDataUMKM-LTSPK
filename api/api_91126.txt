@@ -1,0 +1,28 @@
+function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Master_Data");
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+  var data = [];
+
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+
+    // validasi kolom kosong
+    if (row[0] === "" && row[1] === ""){
+      continue;
+    }
+
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      var key = headers[j].toString().trim().toLowerCase().replace(/\s+/g, '_');
+
+      if (key !== ""){
+        obj[key] = row[j];
+      }
+    }
+    data.push(obj);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}

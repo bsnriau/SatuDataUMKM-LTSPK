@@ -388,6 +388,7 @@
         <section class="filters" aria-label="Filter utama dashboard">
             <div class="field" v-for="f in filterFields" :key="f.key">
                 <label :for="'f-' + f.key">{{ f.label }}</label>
+                <!-- Khusus filter tahun aktif menggunakan opsi custom cascading options[f.key] -->
                 <select :id="'f-' + f.key" v-model="filters[f.key]" :class="{ active: filters[f.key] }">
                     <option value="">{{ f.all }}</option>
                     <option v-for="o in options[f.key]" :key="o.value" :value="o.value">{{ o.value }} ({{ o.count }})</option>
@@ -513,8 +514,9 @@
                             <td data-label="Judul SNI">{{ item.judul_sni || item.sni_yang_diterapkan || '-' }}</td>
 
                             <td data-label="Pembinaan">
-                                <div class="cell-name" style="font-weight:500">{{ item.tahun_mulai_dibina || item.tahun_awal_dibina }}</div>
-                                <div class="cell-sub">{{ item.jenis_pembinaan || '-' }}</div>
+                                <div class="cell-name" style="font-weight:500">Mulai: {{ item.tahun_mulai_dibina || '-' }}</div>
+                                <div class="cell-sub">Aktif: {{ item.tahun_aktif_dibina || item.tahun_berjalan || item.tahun_riwayat || '-' }}</div>
+                                <div class="cell-sub" style="margin-top:2px;">{{ item.jenis_pembinaan || item.jenis || '-' }}</div>
                             </td>
 
                             <td data-label="Progres">
@@ -580,56 +582,86 @@
             const pageSize = ref(10); // Jumlah data per halaman
 
             // =====================================================================
-            // FILTER TERPADU (SALING TERHUBUNG / FACETED)
-            // Setiap filter punya: key, label, teks "semua", dan fungsi pengambil nilai dari data.
-            // Opsi sebuah filter dihitung dari data yang sudah disaring oleh SEMUA filter lain
-            // (filter itu sendiri tidak ikut menyaring, supaya pilihannya tetap bisa diganti).
+            // FILTER TERPADU (SALING TERHUBUNG / TWO-WAY BINDING CASCADING)
             // =====================================================================
             const filterFields = [
-                { key: 'unit',     label: 'Nama unit',         all: 'Semua unit',     get: i => i.nama_unit },
-                { key: 'provinsi', label: 'Provinsi',          all: 'Semua provinsi', get: i => i.provinsi },
-                { key: 'kota',     label: 'Kota / kabupaten',  all: 'Semua kota',     get: i => i.kota },
-                { key: 'tahun',    label: 'Tahun binaan',      all: 'Semua tahun',    get: i => i.tahun_mulai_dibina || i.tahun_awal_dibina },
-                { key: 'progres',  label: 'Progres pembinaan', all: 'Semua progres',  get: i => i.progres_pembinaan || i.progres },
-                { key: 'jenis',    label: 'Jenis sertifikasi', all: 'Semua jenis',    get: i => i.jenis_pembinaan || i.jenis },
-                { key: 'kategori', label: 'Kategori produk',   all: 'Semua kategori', get: i => i.kategori_produk }
+                { key: 'unit',        label: 'Nama unit',            all: 'Semua unit',        get: i => i.nama_unit },
+                { key: 'provinsi',    label: 'Provinsi',             all: 'Semua provinsi',    get: i => i.provinsi },
+                { key: 'kota',        label: 'Kota / kabupaten',     all: 'Semua kota',        get: i => i.kota },
+                { key: 'tahun_mulai', label: 'Tahun Mulai',          all: 'Semua tahun mulai', get: i => i.tahun_mulai_dibina },
+                { key: 'tahun_aktif', label: 'Tahun Aktif Dibina',   all: 'Semua tahun aktif', get: i => i.tahun_aktif_dibina || i.tahun_berjalan || i.tahun_riwayat },
+                { key: 'progres',     label: 'Progres pembinaan',    all: 'Semua progres',     get: i => i.progres_pembinaan || i.progres },
+                { key: 'jenis',       label: 'Jenis sertifikasi',    all: 'Semua jenis',       get: i => i.jenis_pembinaan || i.jenis },
+                { key: 'kategori',    label: 'Kategori produk',      all: 'Semua kategori',    get: i => i.kategori_produk }
             ];
 
             const filters = reactive({});
             filterFields.forEach(f => { filters[f.key] = ''; });
 
-            // Nilai field yang sudah dirapikan (string, tanpa spasi berlebih)
+            // Helper untuk mengambil nilai string bersih dari item
             const val = (f, item) => String(f.get(item) ?? '').trim();
 
-            // Apakah item lolos semua filter aktif, kecuali filter dengan key = skipKey
+            // Pengecekan item apakah lolos filter selain key yang sedang dihitung opsinya (two-way cascading facet)
             const matchesFilters = (item, skipKey) => {
-                return filterFields.every(f =>
-                    f.key === skipKey || !filters[f.key] || val(f, item) === filters[f.key]
-                );
+                return filterFields.every(f => {
+                    if (f.key === skipKey || !filters[f.key]) return true;
+                    
+                    const itemVal = val(f, item);
+                    if (!itemVal) return false;
+
+                    // Khusus untuk filter tahun aktif dibina yang berupa string koma (e.g., "2019, 2020")
+                    if (f.key === 'tahun_aktif') {
+                        const tokens = itemVal.split(',').map(t => t.trim());
+                        return tokens.includes(filters[f.key]);
+                    }
+
+                    // Filter standar lainnya
+                    return itemVal === filters[f.key];
+                });
             };
 
-            // Opsi tiap filter + jumlah data per opsi, mengikuti pilihan filter lain
+            // Opsi tiap filter + jumlah data per opsi, mengikuti pilihan filter lain secara interaktif dua arah
             const options = computed(() => {
                 const out = {};
                 const data = Array.isArray(rawData.value) ? rawData.value : [];
+                
                 filterFields.forEach(f => {
                     const counts = new Map();
+                    
                     data.forEach(item => {
                         if (!matchesFilters(item, f.key)) return;
-                        const v = val(f, item);
-                        if (!v) return;
-                        counts.set(v, (counts.get(v) || 0) + 1);
+                        
+                        const rawV = val(f, item);
+                        if (!rawV) return;
+
+                        // Jika field berupa list koma (tahun_aktif), urai tokennya agar opsi dropdown terpecah presisi
+                        if (f.key === 'tahun_aktif') {
+                            const tokens = rawV.split(',').map(t => t.trim());
+                            tokens.forEach(token => {
+                                if (token) {
+                                    counts.set(token, (counts.get(token) || 0) + 1);
+                                }
+                            });
+                        } else {
+                            counts.set(rawV, (counts.get(rawV) || 0) + 1);
+                        }
                     });
+
                     const list = [...counts].map(([value, count]) => ({ value, count }));
-                    list.sort(f.key === 'tahun'
-                        ? (a, b) => Number(b.value) - Number(a.value)      // tahun terbaru di atas
-                        : (a, b) => a.value.localeCompare(b.value, 'id'));
+                    // Urutkan tahun terbaru di atas, selain itu urut abjad
+                    list.sort((a, b) => {
+                        if (f.key.includes('tahun')) {
+                            return Number(b.value) - Number(a.value);
+                        }
+                        return a.value.localeCompare(b.value, 'id');
+                    });
+                    
                     out[f.key] = list;
                 });
                 return out;
             });
 
-            // Jika pilihan lama tidak lagi tersedia (misal setelah sinkron ulang), kosongkan
+            // Jika pilihan lama tidak lagi tersedia, kosongkan
             const sanitizeFilters = () => {
                 filterFields.forEach(f => {
                     if (filters[f.key] && !options.value[f.key].some(o => o.value === filters[f.key])) {
@@ -670,10 +702,10 @@
                     // 1. Ambil data dalam bentuk array
                     let processedData = Array.isArray(data) ? data : (data.data || []);
 
-                    // 2. Urutkan berdasarkan tahun terbaru (descending)
+                    // 2. Urutkan berdasarkan tahun mulai terbaru (descending)
                     processedData.sort((a, b) => {
-                        const tahunA = Number(a.tahun_mulai_dibina || a.tahun_awal_dibina || 0);
-                        const tahunB = Number(b.tahun_mulai_dibina || b.tahun_awal_dibina || 0);
+                        const tahunA = Number(a.tahun_mulai || a.tahun_mulai_dibina || a.tahun_awal_dibina || 0);
+                        const tahunB = Number(b.tahun_mulai || b.tahun_mulai_dibina || b.tahun_awal_dibina || 0);
                         return tahunB - tahunA;
                     });
 
@@ -695,15 +727,31 @@
             });
 
             // =====================================================================
-            // DATA TURUNAN
+            // DATA TURUNAN & PENCARIAN UTAMA
             // =====================================================================
-            // 1. Data untuk statistik & grafik: dipengaruhi SEMUA filter
+            // 1. Data untuk statistik & grafik: dipengaruhi SEMUA filter secara strict AND logic & exact token matching
             const cardFilteredData = computed(() => {
                 if (!Array.isArray(rawData.value)) return [];
-                return rawData.value.filter(item => matchesFilters(item, null));
+                return rawData.value.filter(item => {
+                    // Cek lolos semua filter aktif
+                    return filterFields.every(f => {
+                        if (!filters[f.key]) return true;
+                        
+                        const itemVal = val(f, item);
+                        if (!itemVal) return false;
+
+                        // Logika pencocokan presisi token untuk tahun aktif dibina
+                        if (f.key === 'tahun_aktif') {
+                            const tokens = itemVal.split(',').map(t => t.trim());
+                            return tokens.includes(filters[f.key]);
+                        }
+
+                        return itemVal === filters[f.key];
+                    });
+                });
             });
 
-            // 2. Data untuk tabel: semua filter + kotak pencarian
+            // 2. Data untuk tabel: semua filter + kotak pencarian teks
             const filteredData = computed(() => {
                 const kw = searchKeyword.value.trim().toLowerCase();
                 if (!kw) return cardFilteredData.value;

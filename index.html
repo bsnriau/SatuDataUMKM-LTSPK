@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Kirim Referer origin agar sesuai kebijakan tile OpenStreetMap saat di-host via HTTP/HTTPS -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Dashboard Pemantauan UKM Binaan - Master Data</title>
     <link rel="icon" type="image/png" href="./img/bsn.png">
 
@@ -15,6 +17,9 @@
     <script src="./js/vue.global.prod.js"></script>
     <!-- FontAwesome Icon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet (peta sebaran) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
     <style>
         :root {
@@ -331,6 +336,18 @@
         .footer strong { color: #fff; font: 650 16px var(--font-display); }
         .footer .logo { width: 34px; height: 34px; padding: 4px; border-radius: 8px; }
 
+        /* ---------- Peta sebaran ---------- */
+        .map-panel { margin-top: 20px; }
+        .map-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .map-ctl select { width: auto; min-width: 210px; }
+        .sebaran-map { height: 480px; border-radius: 12px; margin-top: 16px; border: 1px solid var(--line); position: relative; z-index: 0; isolation: isolate; background: #E8EEF4; }
+        .map-foot { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; font-size: 13px; color: var(--muted); align-items: center; }
+        .map-foot b { color: var(--ink); font-weight: 600; }
+        .mbub { border-radius: 50%; background: rgba(15, 157, 138, .88); color: #fff; font: 600 13px var(--font-body); text-align: center; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(11, 34, 57, .35); cursor: pointer; transition: transform .15s; }
+        .mbub:hover { transform: scale(1.08); }
+        .mbub.approx { background: rgba(15, 157, 138, .5); border-style: dashed; border-color: var(--teal-ink); }
+        .mbub.sel { background: var(--amber); color: var(--ink); }
+
         /* ---------- Responsif ---------- */
         @media (max-width: 1080px) {
             .charts { grid-template-columns: 1fr; }
@@ -535,6 +552,30 @@
                 </ul>
                 <p v-else class="panel-empty">Belum ada data wilayah untuk ditampilkan.</p>
             </article>
+        </section>
+
+        <!-- PETA SEBARAN -->
+        <section class="panel map-panel" aria-label="Peta sebaran UKM binaan">
+            <div class="map-head">
+                <div>
+                    <h2>Peta sebaran UKM binaan</h2>
+                    <p class="sub">Angka pada lingkaran adalah jumlah entri data. Klik lingkaran untuk memfilter, klik lagi untuk melepas.</p>
+                </div>
+                <div class="map-ctl">
+                    <select v-model="mapLevel" aria-label="Tingkat peta">
+                        <option value="auto">Tingkat otomatis</option>
+                        <option value="provinsi">Per provinsi</option>
+                        <option value="kota">Per kota / kabupaten</option>
+                    </select>
+                </div>
+            </div>
+            <p v-if="mapError" class="panel-empty">{{ mapError }}</p>
+            <div id="sebaranMap" class="sebaran-map" v-show="!mapError"></div>
+            <div class="map-foot" v-if="!mapError">
+                <span><b>{{ mapPoints.points.length }}</b> lokasi ({{ mapLevelEff === 'kota' ? 'kota / kabupaten' : 'provinsi' }})</span>
+                <span v-if="mapPoints.noCoord"><i class="fa-solid fa-circle-info"></i> {{ mapPoints.noCoord }} entri tidak ditampilkan karena wilayahnya tidak dikenali</span>
+                <span v-if="geoBusy"><i class="fa-solid fa-spinner fa-spin"></i> Mencari koordinat kota ({{ geoBusy }} tersisa). Lingkaran putus-putus sementara berada di pusat provinsi.</span>
+            </div>
         </section>
 
         <!-- GRAFIK TAMBAHAN -->
@@ -1117,6 +1158,195 @@
                 return out;
             });
 
+            // =====================================================================
+            // PETA SEBARAN (Leaflet) - mengikuti SEMUA filter, klik titik = mengatur filter
+            // =====================================================================
+            const provList = [
+                [['aceh', 'nanggroeacehdarussalam', 'nad'], 4.70, 96.75],
+                [['sumaterautara', 'sumut'], 2.12, 99.55],
+                [['sumaterabarat', 'sumbar'], -0.74, 100.80],
+                [['riau'], 0.29, 101.71],
+                [['kepulauanriau', 'kepriau'], 3.95, 108.14],
+                [['jambi'], -1.61, 103.61],
+                [['sumateraselatan', 'sumsel'], -3.32, 104.91],
+                [['kepulauanbangkabelitung', 'bangkabelitung', 'babel', 'kepbangkabelitung'], -2.74, 106.44],
+                [['bengkulu'], -3.58, 102.34],
+                [['lampung'], -4.56, 105.41],
+                [['dkijakarta', 'jakarta'], -6.21, 106.85],
+                [['banten'], -6.41, 106.06],
+                [['jawabarat', 'jabar'], -6.91, 107.61],
+                [['jawatengah', 'jateng'], -7.15, 110.14],
+                [['diyogyakarta', 'yogyakarta', 'diy'], -7.87, 110.43],
+                [['jawatimur', 'jatim'], -7.54, 112.24],
+                [['bali'], -8.34, 115.09],
+                [['nusatenggarabarat', 'ntb'], -8.65, 117.36],
+                [['nusatenggaratimur', 'ntt'], -8.66, 121.08],
+                [['kalimantanbarat', 'kalbar'], -0.28, 111.47],
+                [['kalimantantengah', 'kalteng'], -1.68, 113.38],
+                [['kalimantanselatan', 'kalsel'], -3.09, 115.28],
+                [['kalimantantimur', 'kaltim'], 0.54, 116.42],
+                [['kalimantanutara', 'kaltara'], 3.07, 116.04],
+                [['sulawesiutara', 'sulut'], 0.62, 123.98],
+                [['gorontalo'], 0.70, 122.45],
+                [['sulawesitengah', 'sulteng'], -1.43, 121.45],
+                [['sulawesibarat', 'sulbar'], -2.84, 119.23],
+                [['sulawesiselatan', 'sulsel'], -3.67, 119.97],
+                [['sulawesitenggara', 'sultra'], -4.14, 122.17],
+                [['maluku'], -3.24, 130.14],
+                [['malukuutara'], 1.57, 127.81],
+                [['papua'], -4.27, 138.08],
+                [['papuabarat'], -1.34, 133.17],
+                [['papuabaratdaya'], -0.88, 131.26],
+                [['papuaselatan'], -7.50, 139.50],
+                [['papuatengah'], -3.90, 136.40],
+                [['papuapegunungan'], -4.10, 139.00]
+            ];
+            const provLookup = {};
+            provList.forEach(([keys, la, ln]) => keys.forEach(k => { provLookup[k] = [la, ln]; }));
+            const normProv = (s) => String(s || '').toLowerCase().replace(/provinsi|prov\.?/g, '').replace(/daerah istimewa/g, 'di').replace(/[^a-z]/g, '');
+            const provCoord = (s) => provLookup[normProv(s)] || null;
+
+            // Koordinat kota/kabupaten dicari lewat Nominatim (OpenStreetMap), disimpan di localStorage agar tidak diulang
+            const geoCache = ref({});
+            try { geoCache.value = JSON.parse(localStorage.getItem('ukm_geo_v1') || '{}') || {}; } catch (e) { geoCache.value = {}; }
+            const geoBusy = ref(0);
+            const geoTried = new Set();
+            const geoQueue = [];
+            let geoRunning = false;
+            const geoKey = (kota, prov) => String(kota).trim().toLowerCase() + '|' + normProv(prov);
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            const runGeocode = async () => {
+                if (geoRunning) return;
+                geoRunning = true;
+                while (geoQueue.length) {
+                    const job = geoQueue.shift();
+                    geoBusy.value = geoQueue.length + 1;
+                    try {
+                        const nama = job.kota.replace(/^kab\.?\s+/i, 'Kabupaten ');
+                        const q = nama + ', ' + job.prov + ', Indonesia';
+                        const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=id&q=' + encodeURIComponent(q));
+                        const j = await res.json();
+                        const hit = j && j[0] ? [parseFloat(j[0].lat), parseFloat(j[0].lon)] : null;
+                        geoCache.value = { ...geoCache.value, [job.key]: hit };
+                        try { localStorage.setItem('ukm_geo_v1', JSON.stringify(geoCache.value)); } catch (e) { /* abaikan */ }
+                    } catch (e) { /* gagal sementara: pakai pusat provinsi */ }
+                    await sleep(1100);
+                }
+                geoBusy.value = 0;
+                geoRunning = false;
+            };
+
+            const mapLevel = ref('auto');
+            const mapError = ref('');
+            const mapLevelEff = computed(() => {
+                if (mapLevel.value !== 'auto') return mapLevel.value;
+                return (filters.provinsi || filters.kota) ? 'kota' : 'provinsi';
+            });
+
+            const mapPoints = computed(() => {
+                const lvl = mapLevelEff.value, cache = geoCache.value, groups = new Map();
+                cardFilteredData.value.forEach(i => {
+                    const prov = String(i.provinsi || '').trim(), kota = String(i.kota || '').trim();
+                    const name = lvl === 'kota' ? kota : prov;
+                    if (!name) return;
+                    const k = lvl === 'kota' ? kota + '|' + prov : prov;
+                    const g = groups.get(k) || { name, prov, kota, count: 0 };
+                    g.count++;
+                    groups.set(k, g);
+                });
+                const points = [];
+                let noCoord = 0;
+                groups.forEach(g => {
+                    let c = null, approx = false, need = null;
+                    if (lvl === 'kota') {
+                        const key = geoKey(g.kota, g.prov);
+                        if (cache[key]) c = cache[key];
+                        else {
+                            c = provCoord(g.prov); approx = !!c;
+                            if (!(key in cache)) need = key;
+                        }
+                    } else {
+                        c = provCoord(g.prov);
+                    }
+                    if (!c) { noCoord += g.count; return; }
+                    points.push({ ...g, lat: c[0], lng: c[1], approx, need });
+                });
+                return { points, noCoord };
+            });
+
+            let leafMap = null, leafLayer = null, lastFitSig = '';
+            const initMap = () => {
+                if (leafMap) return true;
+                if (typeof L === 'undefined') { mapError.value = 'Peta tidak dapat dimuat (pustaka Leaflet diblokir atau tidak tersedia).'; return false; }
+                const el = document.getElementById('sebaranMap');
+                if (!el) return false;
+                leafMap = L.map(el, { scrollWheelZoom: false, minZoom: 3 }).setView([-2.5, 118], 5);
+                // OpenStreetMap standard raster tiles (data terbuka, tanpa API key).
+                // Harus dijalankan melalui HTTP/HTTPS agar browser mengirim Referer;
+                // jangan dibuka langsung sebagai file:// karena server OSM dapat menolak request.
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    minZoom: 3,
+                    maxZoom: 19,
+                    crossOrigin: true,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+                }).addTo(leafMap);
+                leafLayer = L.layerGroup().addTo(leafMap);
+                if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => leafMap && leafMap.invalidateSize()).observe(el);
+                return true;
+            };
+
+            const pickPoint = (p) => {
+                if (mapLevelEff.value === 'kota') {
+                    if (filters.kota === p.kota) { filters.kota = ''; return; }
+                    if (p.prov && filters.provinsi !== p.prov) filters.provinsi = p.prov;
+                    filters.kota = p.kota;
+                } else {
+                    filters.kota = '';
+                    filters.provinsi = filters.provinsi === p.prov ? '' : p.prov;
+                }
+            };
+
+            const drawMap = () => {
+                if (!initMap()) return;
+                leafLayer.clearLayers();
+                const pts = mapPoints.value.points, lvl = mapLevelEff.value;
+                const max = Math.max(1, ...pts.map(p => p.count));
+                const bounds = [];
+                pts.forEach(p => {
+                    const size = Math.round(26 + Math.sqrt(p.count / max) * 38);
+                    const sel = lvl === 'kota' ? filters.kota === p.kota : filters.provinsi === p.prov;
+                    const icon = L.divIcon({
+                        className: '', iconSize: [size, size],
+                        html: '<div class="mbub' + (p.approx ? ' approx' : '') + (sel ? ' sel' : '') + '" style="width:' + size + 'px;height:' + size + 'px;line-height:' + (size - 4) + 'px">' + p.count + '</div>'
+                    });
+                    const tip = document.createElement('div');
+                    tip.textContent = (lvl === 'kota' ? p.kota + ', ' + p.prov : p.prov) + ': ' + p.count + ' entri';
+                    L.marker([p.lat, p.lng], { icon, title: p.name }).addTo(leafLayer).bindTooltip(tip).on('click', () => pickPoint(p));
+                    bounds.push([p.lat, p.lng]);
+                });
+                // Zoom ulang hanya saat filter/tingkat berubah (bukan saat koordinat kota masuk satu per satu)
+                const sig = lvl + JSON.stringify(filters);
+                if (sig !== lastFitSig) {
+                    lastFitSig = sig;
+                    if (bounds.length) leafMap.fitBounds(bounds, { padding: [40, 40], maxZoom: lvl === 'kota' ? 9 : 6 });
+                    else leafMap.setView([-2.5, 118], 5);
+                }
+            };
+
+            watch(mapPoints, (mp) => {
+                let added = false;
+                mp.points.forEach(p => {
+                    if (p.need && !geoTried.has(p.need)) {
+                        geoTried.add(p.need);
+                        geoQueue.push({ key: p.need, kota: p.kota, prov: p.prov });
+                        added = true;
+                    }
+                });
+                if (added) runGeocode();
+                Vue.nextTick(drawMap);
+            });
+            onMounted(() => { setTimeout(() => { if (initMap()) { leafMap.invalidateSize(); drawMap(); } }, 300); });
+
             // Warna segmen bilah progres (urut dari jumlah terbanyak)
             const palette = ['#4FD1C5', '#F5B83D', '#7DB3FF', '#FF8A8A', '#B79CFF', '#7ED957', '#FF9F5A', '#5CE1E6'];
             const progresColor = (i) => palette[i % palette.length];
@@ -1163,7 +1393,8 @@
                 statusKind, kategoriKind, isSelesai, formatDate,
                 tahunIni: new Date().getFullYear(),
                 filterOpen, activeFilters, rawData, expanded, isLong, jenisKind, jenisLabel, jenisIcon,
-                lineChart, colsData, donut, visiblePages
+                lineChart, colsData, donut, visiblePages,
+                mapLevel, mapLevelEff, mapPoints, mapError, geoBusy
             };
         }
     }).mount('#app');

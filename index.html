@@ -343,10 +343,37 @@
         .sebaran-map { height: 480px; border-radius: 12px; margin-top: 16px; border: 1px solid var(--line); position: relative; z-index: 0; isolation: isolate; background: #E8EEF4; }
         .map-foot { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; font-size: 13px; color: var(--muted); align-items: center; }
         .map-foot b { color: var(--ink); font-weight: 600; }
-        .mbub { border-radius: 50%; background: rgba(15, 157, 138, .88); color: #fff; font: 600 13px var(--font-body); text-align: center; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(11, 34, 57, .35); cursor: pointer; transition: transform .15s; }
-        .mbub:hover { transform: scale(1.08); }
-        .mbub.approx { background: rgba(15, 157, 138, .5); border-style: dashed; border-color: var(--teal-ink); }
-        .mbub.sel { background: var(--amber); color: var(--ink); }
+        /* Marker pin lokasi UKM: bentuk pin biru dengan jumlah data di tengah */
+        .map-pin {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fff;
+            border-radius: 50% 50% 50% 0;
+            background: linear-gradient(145deg, #38A5F5, #0756B5);
+            box-shadow: 0 3px 9px rgba(11, 34, 57, .38);
+            transform: rotate(-45deg);
+            cursor: pointer;
+            transition: filter .15s ease, box-shadow .15s ease;
+        }
+        .map-pin:hover { filter: brightness(1.12); box-shadow: 0 4px 12px rgba(11, 34, 57, .45); }
+        .map-pin-count {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            color: #fff;
+            font: 700 12px var(--font-body);
+            line-height: 1;
+            text-align: center;
+            transform: rotate(45deg);
+            white-space: nowrap;
+        }
+        .map-pin.approx { background: linear-gradient(145deg, #83BDEB, #397EBB); border-style: dashed; }
+        .map-pin.sel { background: linear-gradient(145deg, #FFC64D, #E18A00); }
+        .map-pin.sel .map-pin-count { color: #17324D; }
 
         /* ---------- Responsif ---------- */
         @media (max-width: 1080px) {
@@ -1313,11 +1340,14 @@
                 const max = Math.max(1, ...pts.map(p => p.count));
                 const bounds = [];
                 pts.forEach(p => {
-                    const size = Math.round(26 + Math.sqrt(p.count / max) * 38);
+                    const size = Math.round(30 + Math.sqrt(p.count / max) * 26);
                     const sel = lvl === 'kota' ? filters.kota === p.kota : filters.provinsi === p.prov;
+                    const pinClass = 'map-pin' + (p.approx ? ' approx' : '') + (sel ? ' sel' : '');
                     const icon = L.divIcon({
-                        className: '', iconSize: [size, size],
-                        html: '<div class="mbub' + (p.approx ? ' approx' : '') + (sel ? ' sel' : '') + '" style="width:' + size + 'px;height:' + size + 'px;line-height:' + (size - 4) + 'px">' + p.count + '</div>'
+                        className: 'map-pin-icon',
+                        iconSize: [size, size + 8],
+                        iconAnchor: [size / 2, size + 8],
+                        html: '<div class="' + pinClass + '" style="width:' + size + 'px;height:' + size + 'px"><span class="map-pin-count">' + p.count + '</span></div>'
                     });
                     const tip = document.createElement('div');
                     tip.textContent = (lvl === 'kota' ? p.kota + ', ' + p.prov : p.prov) + ': ' + p.count + ' entri';

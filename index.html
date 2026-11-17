@@ -1110,12 +1110,19 @@
             const jenisIcon = { awal: 'fa-solid fa-file-circle-plus', resert: 'fa-solid fa-arrows-rotate', surv: 'fa-solid fa-magnifying-glass-chart', lain: 'fa-regular fa-circle' };
 
             // ---- Grafik per tahun ----
-            const tahunOf = (i) => parseInt(i.tahun_mulai_dibina, 10);
+            const tahunOf = (i) => {
+                const raw = i.tahun_mulai_dibina || i.tahun_mulai || i.tahun_awal_dibina;
+                if (raw === null || raw === undefined || raw === '') return NaN;
+                const match = String(raw).trim().match(/(?:19|20)\d{2}/);
+                return match ? parseInt(match[0], 10) : NaN;
+            };
             const spptYear = (i) => {
                 const raw = i.tanggal_sppt || i.tgl_sppt;
-                if (!raw || raw === '-') return NaN;
-                const d = new Date(raw);
-                return isNaN(d) ? NaN : d.getFullYear();
+                if (!raw || String(raw).trim() === '-' || String(raw).trim() === '') return NaN;
+                
+                // Langsung ekstrak 4 digit tahun (misal dari "20 feb 2026" langsung diambil 2026)
+                const matchYear = String(raw).trim().match(/(?:19|20)\d{2}/);
+                return matchYear ? parseInt(matchYear[0], 10) : NaN;
             };
             const yearList = computed(() => {
                 const ys = cardFilteredData.value.flatMap(i => [tahunOf(i), spptYear(i)]).filter(y => y > 1900 && y < 2100);

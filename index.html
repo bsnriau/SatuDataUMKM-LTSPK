@@ -20,6 +20,10 @@
     <!-- Leaflet (peta sebaran) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <!-- Ekspor Excel & PDF (jika gagal dimuat, ekspor memakai cadangan bawaan browser) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
     <style>
         :root {
@@ -335,6 +339,8 @@
         .footer-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
         .footer strong { color: #fff; font: 650 16px var(--font-display); }
         .footer .logo { width: 34px; height: 34px; padding: 4px; border-radius: 8px; }
+
+        .toolbar .btn-exp { width: auto; height: 40px; padding: 0 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
 
         /* ---------- Peta sebaran ---------- */
         .map-panel { margin-top: 20px; }
@@ -675,6 +681,8 @@
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="text" v-model="searchKeyword" placeholder="Cari nama UKM, produk, atau SNI" aria-label="Cari data">
                     </div>
+                    <button class="btn-ghost btn-exp" @click="exportExcel" :disabled="!filteredData.length || exporting" title="Unduh semua data hasil filter (tanpa batas halaman)"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    <button class="btn-ghost btn-exp" @click="exportPdf" :disabled="!filteredData.length || exporting" title="Unduh semua data hasil filter (tanpa batas halaman)"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                     <select v-model.number="pageSize" aria-label="Jumlah data per halaman">
                         <option v-for="n in [5, 10, 20, 50, 100]" :key="n" :value="n">Tampilkan {{ n }} data</option>
                     </select>
@@ -729,7 +737,7 @@
                             <td data-label="Status sertifikat">
                                 <span v-if="statusKind(item) === 'ok'" class="chip ok"><i class="fa-solid fa-circle-check"></i>{{ item.status_sertifikat }}</span>
                                 <span v-else-if="statusKind(item) === 'bad'" class="chip bad"><i class="fa-solid fa-circle-xmark"></i>{{ item.status_sertifikat }}</span>
-                                <span v-else class="chip none">{{ (item.status_sertifikat && item.status_sertifikat.trim() !== '-') ? item.status_sertifikat : 'Belum tersertifikasi' }}</span>
+                                <span v-else class="chip none">{{ (item.status_sertifikat && String(item.status_sertifikat).trim() !== '-') ? item.status_sertifikat : 'Belum tersertifikasi' }}</span>
                             </td>
                         </tr>
                         <tr v-if="paginatedData.length === 0">
@@ -794,6 +802,9 @@
                 const m = String(raw).match(/(?:19|20)\d{2}/);
                 return m ? m[0] : '';
             };
+
+            // Aman untuk nilai non-string (angka/null/undefined dari API)
+            const low = (v) => String(v ?? '').toLowerCase();
 
             const filterFields = [
                 { key: 'unit',        label: 'Nama unit',            all: 'Semua unit',        get: i => i.nama_unit },
@@ -975,12 +986,12 @@
 
             // 2. Data untuk tabel: semua filter + kotak pencarian teks
             const filteredData = computed(() => {
-                const kw = searchKeyword.value.trim().toLowerCase();
+                const kw = low(searchKeyword.value).trim();
                 if (!kw) return cardFilteredData.value;
                 return cardFilteredData.value.filter(item =>
-                    (item.namau_ukm || item.nama_umk || '').toLowerCase().includes(kw) ||
-                    (item.produk || '').toLowerCase().includes(kw) ||
-                    (item.judul_sni || item.sni_yang_diterapkan || '').toLowerCase().includes(kw)
+                    low(item.namau_ukm || item.nama_umk).includes(kw) ||
+                    low(item.produk).includes(kw) ||
+                    low(item.judul_sni || item.sni_yang_diterapkan).includes(kw)
                 );
             });
 
@@ -992,20 +1003,20 @@
 
             const totalPangan = computed(() => {
                 return cardFilteredData.value.filter(i => {
-                    const kat = (i.kategori_produk || '').toLowerCase();
+                    const kat = low(i.kategori_produk);
                     return kat.includes('pangan') && !kat.includes('non');
                 }).length;
             });
 
             const totalNonPangan = computed(() => {
                 return cardFilteredData.value.filter(i => {
-                    const kat = (i.kategori_produk || '').toLowerCase();
+                    const kat = low(i.kategori_produk);
                     return kat.includes('non') || !kat.includes('pangan');
                 }).length;
             });
 
             const isSelesai = (i) => {
-                const prog = (i.progres_pembinaan || i.progres || '').toLowerCase();
+                const prog = low(i.progres_pembinaan || i.progres);
                 return prog.includes('sppt sni') || prog.includes('selesai') || prog.includes('tersertifikasi');
             };
 
@@ -1018,21 +1029,21 @@
 
             const totalSertifikasiAwal = computed(() => {
                 return cardFilteredData.value.filter(i => {
-                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    const prog = low(i.jenis_pembinaan || i.jenis);
                     return prog.includes('awal') || prog.includes('sertifikasi awal');
                 }).length;
             });
 
             const totalResertifikasi = computed(() => {
                 return cardFilteredData.value.filter(i => {
-                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    const prog = low(i.jenis_pembinaan || i.jenis);
                     return prog.includes('resertifikasi') || prog.includes('ulang');
                 }).length;
             });
 
             const totalSurveilan = computed(() => {
                 return cardFilteredData.value.filter(i => {
-                    const prog = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                    const prog = low(i.jenis_pembinaan || i.jenis);
                     return prog.includes('surveilan') || prog.includes('surveillance');
                 }).length;
             });
@@ -1100,7 +1111,7 @@
 
             // ---- Jenis pembinaan -> badge & grafik ----
             const jenisKind = (i) => {
-                const j = (i.jenis_pembinaan || i.jenis || '').toLowerCase();
+                const j = low(i.jenis_pembinaan || i.jenis);
                 if (j.includes('resertifikasi') || j.includes('ulang')) return 'resert';
                 if (j.includes('surveilan') || j.includes('surveillance')) return 'surv';
                 if (j.includes('awal')) return 'awal';
@@ -1384,20 +1395,107 @@
             });
             onMounted(() => { setTimeout(() => { if (initMap()) { leafMap.invalidateSize(); drawMap(); } }, 300); });
 
+            // =====================================================================
+            // EKSPOR EXCEL & PDF - memakai SELURUH data hasil filter + pencarian (bukan hanya halaman aktif)
+            // =====================================================================
+            const exporting = ref(false);
+            const exportHeaders = ['No', 'Nama UKM', 'Alamat', 'Unit', 'Kota/Kabupaten', 'Provinsi', 'Kontak PIC', 'Produk', 'Kategori Produk',
+                'Judul SNI', 'Tahun Mulai Dibina', 'Tahun Aktif', 'Jenis', 'Progres', 'Detail Progres', 'Tanggal SPPT', 'Berakhir SPPT', 'Status Sertifikat'];
+            const exportRows = () => filteredData.value.map((i, n) => {
+                const st = i.status_sertifikat && String(i.status_sertifikat).trim() !== '-' ? i.status_sertifikat : 'Belum tersertifikasi';
+                return [
+                    n + 1, i.namau_ukm || i.nama_umk || '', i.alamat_lengkap || '', i.nama_unit || '', i.kota || '', i.provinsi || '', i.kontak_pic || '',
+                    i.produk || '', i.kategori_produk || '', i.judul_sni || i.sni_yang_diterapkan || '', i.tahun_mulai_dibina || '',
+                    i.tahun_aktif_dibina || i.tahun_berjalan || i.tahun_riwayat || '', i.jenis_pembinaan || i.jenis || '',
+                    i.progres_pembinaan || i.progres || '', i.detail_progres || '',
+                    formatDate(i.tanggal_sppt || i.tgl_sppt), formatDate(i.tanggal_berakhir_sppt || i.tgl_berakhir), st
+                ].map(v => (v === null || v === undefined) ? '' : (typeof v === 'object' ? JSON.stringify(v) : v));
+            });
+            const exportName = (ext) => {
+                const d = new Date(), p2 = (x) => String(x).padStart(2, '0');
+                return 'data-ukm-binaan_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes()) + '.' + ext;
+            };
+            const escHtml = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const downloadBlob = (blob, name) => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = name;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+            };
+            const tableHtml = (rows) => '<table border="1"><thead><tr>' + exportHeaders.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
+                + rows.map(r => '<tr>' + r.map(v => '<td>' + escHtml(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+
+            const exportExcel = () => {
+                if (!filteredData.value.length) return;
+                exporting.value = true;
+                try {
+                    const rows = exportRows();
+                    if (typeof XLSX !== 'undefined') {
+                        const ws = XLSX.utils.aoa_to_sheet([exportHeaders, ...rows]);
+                        ws['!cols'] = [6, 30, 36, 22, 20, 20, 18, 28, 16, 30, 12, 12, 18, 20, 40, 14, 14, 20].map(w => ({ wch: w }));
+                        ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: exportHeaders.length - 1 } }) };
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, 'Data UKM Binaan');
+                        XLSX.writeFile(wb, exportName('xlsx'));
+                    } else {
+                        // Cadangan tanpa pustaka: tabel HTML yang dapat dibuka Excel
+                        const html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>' + tableHtml(rows) + '</body></html>';
+                        downloadBlob(new Blob(['﻿' + html], { type: 'application/vnd.ms-excel' }), exportName('xls'));
+                    }
+                } catch (e) { alert('Ekspor Excel gagal: ' + e.message); }
+                finally { exporting.value = false; }
+            };
+
+            const exportPdf = () => {
+                if (!filteredData.value.length) return;
+                exporting.value = true;
+                try {
+                    const rows = exportRows();
+                    const JsPDF = window.jspdf && window.jspdf.jsPDF;
+                    if (JsPDF) {
+                        const doc = new JsPDF({ orientation: 'landscape', unit: 'pt', format: 'a3' });
+                        if (typeof doc.autoTable !== 'function') throw new Error('plugin tabel PDF tidak termuat');
+                        const W = doc.internal.pageSize.getWidth();
+                        doc.setFontSize(15); doc.text('Data UKM Binaan', 28, 32);
+                        doc.setFontSize(9); doc.setTextColor(100);
+                        const info = rows.length + ' data' + (hasFilter.value || searchKeyword.value ? ' (sesuai filter / pencarian)' : '') + ' · dicetak ' + new Date().toLocaleString('id-ID');
+                        doc.text(info, 28, 47);
+                        doc.autoTable({
+                            head: [exportHeaders], body: rows, startY: 58, theme: 'grid',
+                            styles: { fontSize: 6.5, cellPadding: 3, overflow: 'linebreak', valign: 'top' },
+                            headStyles: { fillColor: [11, 34, 57], textColor: 255, fontSize: 7 },
+                            alternateRowStyles: { fillColor: [245, 248, 251] },
+                            columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 80 }, 2: { cellWidth: 95 }, 14: { cellWidth: 120 } },
+                            margin: { left: 20, right: 20, bottom: 28 },
+                            didDrawPage: (d) => { doc.setFontSize(8); doc.setTextColor(120); doc.text('Halaman ' + doc.internal.getNumberOfPages(), W - 70, doc.internal.pageSize.getHeight() - 12); }
+                        });
+                        doc.save(exportName('pdf'));
+                    } else {
+                        // Cadangan tanpa pustaka: buka jendela cetak -> "Simpan sebagai PDF"
+                        const w = window.open('', '_blank');
+                        if (!w) throw new Error('pop-up diblokir browser');
+                        w.document.write('<html><head><meta charset="UTF-8"><title>Data UKM Binaan</title><style>@page{size:A3 landscape;margin:10mm}body{font:10px sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:3px;vertical-align:top}th{background:#0B2239;color:#fff}</style></head><body><h2>Data UKM Binaan</h2>'
+                            + tableHtml(rows) + '<script>window.onload=function(){window.print()}<\/script></body></html>');
+                        w.document.close();
+                    }
+                } catch (e) { alert('Ekspor PDF gagal: ' + e.message); }
+                finally { exporting.value = false; }
+            };
+
             // Warna segmen bilah progres (urut dari jumlah terbanyak)
             const palette = ['#4FD1C5', '#F5B83D', '#7DB3FF', '#FF8A8A', '#B79CFF', '#7ED957', '#FF9F5A', '#5CE1E6'];
             const progresColor = (i) => palette[i % palette.length];
 
             // Status sertifikat -> 'ok' | 'bad' | 'none'
             const statusKind = (item) => {
-                const s = (item.status_sertifikat || '').toLowerCase();
+                const s = low(item.status_sertifikat);
                 if (['masih berlaku', 'aktif', 'berlaku'].includes(s)) return 'ok';
                 if (['tidak berlaku', 'expired', 'kedaluwarsa', 'cabut'].some(k => s.includes(k))) return 'bad';
                 return 'none';
             };
 
             const kategoriKind = (item) => {
-                const kat = (item.kategori_produk || '').toLowerCase();
+                const kat = low(item.kategori_produk);
                 return kat.includes('pangan') && !kat.includes('non') ? 'pangan' : 'non';
             };
 
@@ -1431,7 +1529,8 @@
                 tahunIni: new Date().getFullYear(),
                 filterOpen, activeFilters, rawData, expanded, isLong, jenisKind, jenisLabel, jenisIcon,
                 lineChart, colsData, donut, visiblePages,
-                mapLevel, mapLevelEff, mapPoints, mapError, geoBusy
+                mapLevel, mapLevelEff, mapPoints, mapError, geoBusy,
+                exporting, exportExcel, exportPdf
             };
         }
     }).mount('#app');
